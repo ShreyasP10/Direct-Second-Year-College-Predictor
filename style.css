@@ -1,3 +1,5 @@
+//StyleSheet for Predictor
+
 :root {
     --primary: #4361ee;
     --secondary: #3f37c9;
@@ -170,6 +172,7 @@ input:focus {
 
 button {
     background: linear-gradient(to right, var(--primary), var(--accent));
+
     color: white;
     font-weight: 600;
     cursor: pointer;
