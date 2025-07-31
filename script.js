@@ -1,414 +1,366 @@
-      // Global variables
-        let excelData = [];
-        let filteredData = [];
-        const resultsPerPage = 20;
-        let currentPage = 1;
-        let totalPages = 1;
-        let seatChoices, branchChoices, collegeChoices;
+// Global variables
+let excelData = [];
+let filteredData = [];
+const resultsPerPage = 20;
+let currentPage = 1;
+let totalPages = 1;
+let seatChoices, branchChoices, collegeChoices, regionChoices;
 
-        // Helper functions
-        function showNotification(message, type = 'error') {
-            const notification = document.getElementById('notification');
-            notification.querySelector('span').textContent = message;
-            notification.className = `notification ${type} show`;
-            
-            setTimeout(() => {
-                notification.className = 'notification';
-            }, 5000);
-        }
+// Determine college type
+function getCollegeTypeFromInstitute(name) {
+  if (!name) return "Other";
+  const lower = name.toLowerCase();
+  if (lower.includes("government") && lower.includes("autonomous"))
+    return "Government‑Autonomous";
+  if (lower.includes("government")) return "Government";
+  if (lower.startsWith("-aided") || /\bunaided\b/.test(lower)) return "Unaided";
+  if (/\baided\b/.test(lower)) return "Aided";
+  if (lower.includes("autonomous")) return "Autonomous";
+  return "Other";
+}
 
-        function getCollegeTypeFromInstitute(instituteName) {
-            if (!instituteName) return "Other";
-            
-            const name = instituteName.toLowerCase();
-            if (name.includes("government") && name.includes("autonomous")) return "Government-Autonomous";
-            if (name.includes("government")) return "Government";
-            if (name.includes("autonomous")) return "Autonomous";
-            if (name.includes("aided")) return "Aided";
-            if (name.includes("unaided")) return "Unaided";
-            return "Other";
-        }
+// Mapping code prefixes to region
+const regionMapping = {
+  Amravati: "1",
+  Sambhajinagar: "2",
+  Mumbai: "3",
+  Nagpur: "4",
+  Nashik: "5",
+  Pune: "6"
+};
 
-        // Initialize Choices.js dropdowns
-        function initDropdowns() {
-            seatChoices = new Choices('#seatType', {
-                removeItemButton: true,
-                placeholder: true,
-                placeholderValue: "Choose seat types",
-                allowHTML: false,
-                duplicateItemsAllowed: false,
-                searchEnabled: true,
-                searchPlaceholderValue: "Search seat types"
-            });
+// Unified selection helper
+function getSelectedValues(instance) {
+  const selected = instance.getValue(true);
+  if (selected.includes("ALL_BRANCHES")) {
+    return instance._currentState.choices
+      .map((c) => c.value)
+      .filter((v) => v !== "ALL_BRANCHES");
+  }
+  return selected;
+}
 
-            branchChoices = new Choices('#branch', {
-                removeItemButton: true,
-                placeholder: true,
-                placeholderValue: "Choose branches",
-                allowHTML: false,
-                duplicateItemsAllowed: false,
-                searchEnabled: true,
-                searchPlaceholderValue: "Search branches"
-            });
+// Toast notification logic
+function showNotification(message, type = "error") {
+  const notif = document.getElementById("notification");
+  notif.querySelector("span").textContent = message;
+  notif.className = `notification ${type} show`;
+  setTimeout(() => {
+    notif.className = "notification";
+  }, 5000);
+}
 
-            collegeChoices = new Choices('#collegeType', {
-                removeItemButton: true,
-                placeholder: true,
-                placeholderValue: "Choose college types",
-                allowHTML: false,
-                duplicateItemsAllowed: false,
-                searchEnabled: true,
-                searchPlaceholderValue: "Search college types"
-            });
-        }
+// Initialize Choices.js dropdowns
+function initDropdowns() {
+  seatChoices = new Choices("#seatType", {
+    removeItemButton: true,
+    placeholder: true,
+    placeholderValue: "Choose seat types"
+  });
+  branchChoices = new Choices("#branch", {
+    removeItemButton: true,
+    placeholder: true,
+    placeholderValue: "Choose branches"
+  });
+  collegeChoices = new Choices("#collegeType", {
+    removeItemButton: true,
+    placeholder: true,
+    placeholderValue: "Choose college types"
+  });
+  regionChoices = new Choices("#region", {
+    removeItemButton: true,
+    placeholder: true,
+    placeholderValue: "Select region(s)"
+  });
 
-        // Populate dropdowns from JSON data
-        function populateDropdowns(data) {
-            // Seat types
-            const seatTypes = [...new Set(data.map(d => d["Seat Type"]))];
-            seatChoices.setChoices(seatTypes.map(type => ({ value: type, label: type })), 'value', 'label', true);
+  regionChoices.setChoices(
+    Object.keys(regionMapping).map((r) => ({ value: r, label: r })),
+    "value",
+    "label",
+    true
+  );
+}
 
-            // Branches
-            const branches = [...new Set(data.map(d => d["Branch"]))];
-            branchChoices.setChoices(branches.map(branch => ({ value: branch, label: branch })), 'value', 'label', true);
+// Populate dropdowns dynamically from loaded data
+function populateDropdowns(data) {
+  const seatTypes = [...new Set(data.map((d) => d["Seat Type"]).filter(Boolean))];
+  seatChoices.setChoices(
+    seatTypes.map((s) => ({ value: s, label: s })),
+    "value",
+    "label",
+    true
+  );
 
-            // College types already populated in HTML
-        }
+  const branches = [...new Set(data.map((d) => d["Branch"]).filter(Boolean))];
+  branches.sort();
+  const branchOptions = [
+    { value: "ALL_BRANCHES", label: "All Branches" },
+    ...branches.map((b) => ({ value: b, label: b }))
+  ];
+  branchChoices.setChoices(branchOptions, "value", "label", true);
 
-        // Get selected values from Choices.js dropdowns
-        function getSelectedValues(choicesInstance) {
-            return choicesInstance.getValue(true);
-        }
+  const collegeTypes = [
+    ...new Set(data.map((d) => getCollegeTypeFromInstitute(d["Institute"])))
+  ];
+  collegeChoices.setChoices(
+    collegeTypes.map((c) => ({ value: c, label: c })),
+    "value",
+    "label",
+    true
+  );
+}
 
-        // Show loading state
-        function showLoading(show) {
-            if (show) {
-                const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'loading';
-                loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading colleges...';
-                document.querySelector('main').appendChild(loadingDiv);
-            } else {
-                const loading = document.querySelector('.loading');
-                if (loading) loading.remove();
-            }
-        }
+// Show or hide loading spinner
+function showLoading(show) {
+  if (show) {
+    const div = document.createElement("div");
+    div.className = "loading";
+    div.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading colleges...';
+    document.querySelector("main").appendChild(div);
+  } else {
+    document.querySelector(".loading")?.remove();
+  }
+}
 
-        // Filter data based on form selections
-        function filterData() {
-            const seatTypes = getSelectedValues(seatChoices);
-            const branches = getSelectedValues(branchChoices);
-            const collegeTypes = getSelectedValues(collegeChoices);
-            const predictType = document.querySelector('input[name="predictType"]:checked').value;
-            const inputValue = parseFloat(document.getElementById("inputValue").value);
-            const collegeCount = document.getElementById("collegeCount").value;
+// Main filtering logic
+function filterData() {
+  const regions = getSelectedValues(regionChoices);
+  const seatTypes = getSelectedValues(seatChoices);
+  const branches = getSelectedValues(branchChoices);
+  const collegeTypes = getSelectedValues(collegeChoices);
+  const predictType = document.querySelector('input[name="predictType"]:checked').value;
+  const inputValue = parseFloat(document.getElementById("inputValue").value);
+  const collegeCount = document.getElementById("collegeCount").value;
 
-            // Validate input
-            if (isNaN(inputValue)) {
-                showNotification("Please enter a valid percentile or rank", "error");
-                return null;
-            }
+  if (isNaN(inputValue)) {
+    showNotification("Please enter a valid percentile or rank");
+    return null;
+  }
+  if (predictType === "percentile" && (inputValue < 0 || inputValue > 100)) {
+    showNotification("Percentile must be between 0 and 100");
+    return null;
+  }
 
-            if (predictType === "percentile" && (inputValue < 0 || inputValue > 100)) {
-                showNotification("Percentile must be between 0 and 100", "error");
-                return null;
-            }
+  let filtered = [...excelData];
 
-            let filtered = [...excelData];
+  if (seatTypes.length) {
+    filtered = filtered.filter((d) => seatTypes.includes(d["Seat Type"]));
+  }
+  if (branches.length) {
+    filtered = filtered.filter((d) => branches.includes(d["Branch"]));
+  }
+  if (collegeTypes.length) {
+    filtered = filtered.filter((d) =>
+      collegeTypes.includes(getCollegeTypeFromInstitute(d["Institute"]))
+    );
+  }
 
-            // Apply filters
-            if (seatTypes.length > 0 && !seatTypes.includes("All")) {
-                filtered = filtered.filter(d => seatTypes.includes(d["Seat Type"]));
-            }
+  if (predictType === "rank") {
+    filtered = filtered.filter((d) => d["Rank"] && inputValue <= d["Rank"]);
+  } else {
+    filtered = filtered.filter((d) => d["Percentile"] && inputValue >= d["Percentile"]);
+  }
 
-            if (branches.length > 0 && !branches.includes("All")) {
-                filtered = filtered.filter(d => branches.includes(d["Branch"]));
-            }
+  if (regions.length) {
+    filtered = filtered.filter((d) => {
+      const code = String(d["Institute Code"] || "");
+      return regions.some((r) => code.startsWith(regionMapping[r]));
+    });
+  }
 
-            if (collegeTypes.length > 0 && !collegeTypes.includes("All")) {
-                filtered = filtered.filter(d => {
-                    const collegeType = getCollegeTypeFromInstitute(d["Institute"]);
-                    return collegeTypes.includes(collegeType);
-                });
-            }
+  filtered.sort((a, b) => (b["Percentile"] || 0) - (a["Percentile"] || 0));
 
-            // Apply percentile/rank filter
-            if (predictType === "rank") {
-                filtered = filtered.filter(d => d["Rank"] && inputValue <= d["Rank"]);
-            } else {
-                filtered = filtered.filter(d => d["Percentile"] && inputValue >= d["Percentile"]);
-            }
+  if (collegeCount !== "all") {
+    filtered = filtered.slice(0, parseInt(collegeCount, 10));
+  }
 
-            // Sort by percentile descending
-            filtered.sort((a, b) => (b["Percentile"] || 0) - (a["Percentile"] || 0));
+  return filtered;
+}
 
-            // Limit results
-            if (collegeCount !== "all") {
-                filtered = filtered.slice(0, parseInt(collegeCount));
-            }
+// Display selected filter criteria
+function displaySearchParams() {
+  const params = [
+    { label: "Region", value: getSelectedValues(regionChoices).join(", ") || "All" },
+    { label: "Seat Type", value: getSelectedValues(seatChoices).join(", ") || "All" },
+    { label: "Branch", value: getSelectedValues(branchChoices).join(", ") || "All" },
+    { label: "College Type", value: getSelectedValues(collegeChoices).join(", ") || "All" }
+  ];
 
-            return filtered;
-        }
+  const predictType = document.querySelector('input[name="predictType"]:checked').value;
+  params.push({ label: "Filter By", value: predictType === "percentile" ? "Percentile" : "Rank" });
+  params.push({
+    label: predictType === "percentile" ? "Percentile" : "Rank",
+    value: document.getElementById("inputValue").value
+  });
 
-        // Display search parameters
-        function displaySearchParams() {
-            const seatTypes = getSelectedValues(seatChoices);
-            const branches = getSelectedValues(branchChoices);
-            const collegeTypes = getSelectedValues(collegeChoices);
-            const predictType = document.querySelector('input[name="predictType"]:checked').value;
-            const inputValue = document.getElementById("inputValue").value;
+  const container = document.getElementById("searchParams");
+  container.innerHTML = "";
+  params.forEach((p) => {
+    const div = document.createElement("div");
+    div.className = "param-card";
+    div.innerHTML = `<h3>${p.label}</h3><p>${p.value}</p>`;
+    container.appendChild(div);
+  });
+}
 
-            const paramsContainer = document.getElementById("searchParams");
-            paramsContainer.innerHTML = '';
+// Show paginated results
+function displayResults(page = 1) {
+  currentPage = page;
+  const start = (page - 1) * resultsPerPage;
+  const end = Math.min(start + resultsPerPage, filteredData.length);
+  const slice = filteredData.slice(start, end);
 
-            const params = [
-                { label: "Seat Type", value: seatTypes.length > 0 ? seatTypes.join(", ") : "All" },
-                { label: "Branch", value: branches.length > 0 ? branches.join(", ") : "All" },
-                { label: "College Type", value: collegeTypes.length > 0 ? collegeTypes.join(", ") : "All" },
-                { label: "Filter By", value: predictType === "percentile" ? "Percentile" : "Rank" },
-                { label: predictType === "percentile" ? "Percentile" : "Rank", value: inputValue }
-            ];
+  const body = document.getElementById("resultsBody");
+  body.innerHTML = slice.length
+    ? ""
+    : `<tr><td colspan="6">No colleges found</td></tr>`;
+  slice.forEach((d) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d["Institute"] || "N/A"}</td>
+      <td>${d["Branch"] || "N/A"}</td>
+      <td>${getCollegeTypeFromInstitute(d["Institute"])}</td>
+      <td>${d["Seat Type"] || "N/A"}</td>
+      <td>${d["Rank"] ?? "N/A"}</td>
+      <td>${d["Percentile"] ?? "N/A"}</td>`;
+    body.appendChild(tr);
+  });
 
-            params.forEach(param => {
-                const card = document.createElement('div');
-                card.className = 'param-card';
-                card.innerHTML = `
-                    <h3>${param.label}</h3>
-                    <p>${param.value}</p>
-                `;
-                paramsContainer.appendChild(card);
-            });
-        }
+  totalPages = Math.ceil(filteredData.length / resultsPerPage);
+  document.getElementById("totalResults").textContent = filteredData.length;
+  document.getElementById("currentPage").textContent = start + 1;
+  document.getElementById("totalPages").textContent = end;
 
-        // Display results in table
-        function displayResults(page = 1) {
-            currentPage = page;
-            const startIndex = (page - 1) * resultsPerPage;
-            const endIndex = Math.min(startIndex + resultsPerPage, filteredData.length);
-            const pageData = filteredData.slice(startIndex, endIndex);
+  renderPagination();
+}
 
-            const resultsBody = document.getElementById("resultsBody");
-            resultsBody.innerHTML = '';
+// Build pagination controls
+function renderPagination() {
+  const container = document.getElementById("pagination");
+  container.innerHTML = "";
 
-            if (pageData.length === 0) {
-                resultsBody.innerHTML = `<tr><td colspan="6" class="no-results">
-                    <i class="fas fa-university"></i>
-                    <p>No colleges found matching your criteria</p>
-                </td></tr>`;
-                return;
-            }
+  const prevBtn = document.createElement("button");
+  prevBtn.textContent = "<";
+  prevBtn.disabled = currentPage === 1;
+  prevBtn.onclick = () => displayResults(currentPage - 1);
+  container.appendChild(prevBtn);
 
-            pageData.forEach(row => {
-                const collegeType = getCollegeTypeFromInstitute(row["Institute"]);
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row["Institute"] || "N/A"}</td>
-                    <td>${row["Branch"] || "N/A"}</td>
-                    <td>${collegeType}</td>
-                    <td>${row["Seat Type"] || "N/A"}</td>
-                    <td>${row["Rank"] !== undefined ? row["Rank"] : "N/A"}</td>
-                    <td>${row["Percentile"] !== undefined ? row["Percentile"] : "N/A"}</td>
-                `;
-                resultsBody.appendChild(tr);
-            });
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  for (let i = start; i <= end; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    btn.className = i === currentPage ? "active" : "";
+    btn.onclick = () => displayResults(i);
+    container.appendChild(btn);
+  }
 
-            // Update pagination
-            totalPages = Math.ceil(filteredData.length / resultsPerPage);
-            document.getElementById("totalResults").textContent = filteredData.length;
-            document.getElementById("currentPage").textContent = startIndex + 1;
-            document.getElementById("totalPages").textContent = endIndex;
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = ">";
+  nextBtn.disabled = currentPage === totalPages;
+  nextBtn.onclick = () => displayResults(currentPage + 1);
+  container.appendChild(nextBtn);
+}
 
-            renderPagination();
-        }
+// Export visible results to PDF
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text("College Prediction Results", 105, 15, null, null, "center");
+  doc.setFontSize(12);
+  let y = 30;
+  document.querySelectorAll(".param-card").forEach((card) => {
+    doc.text(`${card.querySelector("h3").textContent}: ${card.querySelector("p").textContent}`, 15, y);
+    y += 8;
+  });
+  const headers = [["Institute", "Branch", "College Type", "Seat Type", "Rank", "Percentile"]];
+  const body = filteredData.map((r) => [
+    r["Institute"] || "N/A",
+    r["Branch"] || "N/A",
+    getCollegeTypeFromInstitute(r["Institute"]),
+    r["Seat Type"] || "N/A",
+    r["Rank"] ?? "N/A",
+    r["Percentile"] ?? "N/A"
+  ]);
+  doc.autoTable({ startY: y + 10, head: headers, body, styles: { fontSize: 9 } });
+  doc.save(`college-predictor-${Date.now()}.pdf`);
+}
 
-        // Render pagination buttons
-        function renderPagination() {
-            const pagination = document.getElementById("pagination");
-            pagination.innerHTML = '';
+// Live search filter on displayed results
+function searchResults() {
+  const term = document.getElementById("searchResults").value.toLowerCase();
+  if (!term) return displayResults(currentPage);
+  const results = filteredData.filter((d) =>
+    d["Institute"]?.toLowerCase().includes(term) ||
+    d["Branch"]?.toLowerCase().includes(term) ||
+    d["Seat Type"]?.toLowerCase().includes(term)
+  );
+  const body = document.getElementById("resultsBody");
+  body.innerHTML = results.length
+    ? ""
+    : `<tr><td colspan="6">No results</td></tr>`;
+  results.forEach((d) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d["Institute"] || "N/A"}</td>
+      <td>${d["Branch"] || "N/A"}</td>
+      <td>${getCollegeTypeFromInstitute(d["Institute"])}</td>
+      <td>${d["Seat Type"] || "N/A"}</td>
+      <td>${d["Rank"] ?? "N/A"}</td>
+      <td>${d["Percentile"] ?? "N/A"}</td>`;
+    body.appendChild(tr);
+  });
+}
 
-            // Previous button
-            const prevButton = document.createElement('button');
-            prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
-            prevButton.disabled = currentPage === 1;
-            prevButton.addEventListener('click', () => displayResults(currentPage - 1));
-            pagination.appendChild(prevButton);
+// Reset filters & UI
+function resetForm() {
+  document.getElementById("predictorForm").reset();
+  document.querySelector(".container").style.display = "block";
+  document.getElementById("resultsContainer").style.display = "none";
+  seatChoices.clearStore();
+  branchChoices.clearStore();
+  collegeChoices.clearStore();
+  regionChoices.clearStore();
+  populateDropdowns(excelData);
+}
 
-            // Page buttons
-            const startPage = Math.max(1, currentPage - 2);
-            const endPage = Math.min(totalPages, startPage + 4);
+// Initialization
+async function initApp() {
+  initDropdowns();
+  showLoading(true);
+  try {
+    const res = await fetch("DSE-Engineering-College-List.json");
+    const json = await res.json();
+    excelData = json["MHT-CET College Data"];
+    populateDropdowns(excelData);
+    showLoading(false);
 
-            for (let i = startPage; i <= endPage; i++) {
-                const pageButton = document.createElement('button');
-                pageButton.textContent = i;
-                pageButton.className = i === currentPage ? 'active' : '';
-                pageButton.addEventListener('click', () => displayResults(i));
-                pagination.appendChild(pageButton);
-            }
+    document.getElementById("predictButton").addEventListener("click", () => {
+      filteredData = filterData();
+      if (filteredData && filteredData.length) {
+        document.querySelector(".container").style.display = "none";
+        document.getElementById("resultsContainer").style.display = "block";
+        displaySearchParams();
+        displayResults();
+      } else {
+        showNotification("No colleges found matching your criteria", "info");
+      }
+    });
 
-            // Next button
-            const nextButton = document.createElement('button');
-            nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
-            nextButton.disabled = currentPage === totalPages;
-            nextButton.addEventListener('click', () => displayResults(currentPage + 1));
-            pagination.appendChild(nextButton);
-        }
+    document.getElementById("resetBtn").addEventListener("click", resetForm);
+    document.getElementById("downloadPdfBtn").addEventListener("click", downloadPDF);
+    document.getElementById("searchResults").addEventListener("input", searchResults);
+    document.getElementById("clearSearch").addEventListener("click", () => {
+      document.getElementById("searchResults").value = "";
+      displayResults(currentPage);
+    });
+  } catch (err) {
+    console.error(err);
+    showLoading(false);
+    showNotification("Failed to load college data", "error");
+  }
+}
 
-        // Download PDF
-        function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Title
-            doc.setFontSize(18);
-            doc.text("College Prediction Results", 105, 15, null, null, 'center');
-            doc.setFontSize(12);
-            
-            // Parameters
-            const params = document.querySelectorAll('.param-card');
-            let yPos = 30;
-            
-            params.forEach(param => {
-                const label = param.querySelector('h3').textContent;
-                const value = param.querySelector('p').textContent;
-                doc.text(`${label}: ${value}`, 15, yPos);
-                yPos += 8;
-            });
-            
-            // Table
-            const headers = [["Institute", "Branch", "College Type", "Seat Type", "Closing Rank", "Percentile"]];
-            const data = filteredData.map(row => [
-                row["Institute"] || "N/A",
-                row["Branch"] || "N/A",
-                getCollegeTypeFromInstitute(row["Institute"]),
-                row["Seat Type"] || "N/A",
-                row["Rank"] !== undefined ? row["Rank"] : "N/A",
-                row["Percentile"] !== undefined ? row["Percentile"] : "N/A"
-            ]);
-            
-            doc.autoTable({
-                startY: yPos + 10,
-                head: headers,
-                body: data,
-                theme: 'grid',
-                headStyles: { fillColor: [67, 97, 238] },
-                styles: { fontSize: 9, cellPadding: 2 },
-                margin: { top: yPos + 10 }
-            });
-            
-            // Footer
-            const date = new Date().toLocaleDateString();
-            doc.setFontSize(10);
-            doc.text(`Generated on ${date} | College Predictor`, 105, doc.internal.pageSize.height - 10, null, null, 'center');
-            
-            doc.save(`college-predictor-results-${new Date().getTime()}.pdf`);
-        }
-
-        // Reset form and show predictor
-        function resetForm() {
-            document.querySelector(".container").style.display = "block";
-            document.getElementById("resultsContainer").style.display = "none";
-            document.getElementById("predictorForm").reset();
-            
-            // Reset Choices.js dropdowns
-            seatChoices.clearStore();
-            branchChoices.clearStore();
-            collegeChoices.clearStore();
-            
-            // Re-add the "All" options
-            seatChoices.setChoices([{ value: "All", label: "All" }], 'value', 'label', false);
-            branchChoices.setChoices([{ value: "All", label: "All" }], 'value', 'label', false);
-            collegeChoices.setChoices([
-                { value: "All", label: "All" },
-                { value: "Government", label: "Government" },
-                { value: "Autonomous", label: "Autonomous" },
-                { value: "Aided", label: "Aided" },
-                { value: "Unaided", label: "Unaided" }
-            ], 'value', 'label', false);
-        }
-
-        // Search results
-        function searchResults() {
-            const searchTerm = document.getElementById("searchResults").value.toLowerCase();
-            if (!searchTerm) {
-                displayResults(currentPage);
-                return;
-            }
-            
-            const searchData = filteredData.filter(row => 
-                (row["Institute"] && row["Institute"].toLowerCase().includes(searchTerm)) ||
-                (row["Branch"] && row["Branch"].toLowerCase().includes(searchTerm)) ||
-                (row["Seat Type"] && row["Seat Type"].toLowerCase().includes(searchTerm))
-            );
-            
-            const resultsBody = document.getElementById("resultsBody");
-            resultsBody.innerHTML = '';
-            
-            if (searchData.length === 0) {
-                resultsBody.innerHTML = `<tr><td colspan="6">No colleges found matching "${searchTerm}"</td></tr>`;
-                return;
-            }
-            
-            searchData.forEach(row => {
-                const collegeType = getCollegeTypeFromInstitute(row["Institute"]);
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row["Institute"] || "N/A"}</td>
-                    <td>${row["Branch"] || "N/A"}</td>
-                    <td>${collegeType}</td>
-                    <td>${row["Seat Type"] || "N/A"}</td>
-                    <td>${row["Rank"] !== undefined ? row["Rank"] : "N/A"}</td>
-                    <td>${row["Percentile"] !== undefined ? row["Percentile"] : "N/A"}</td>
-                `;
-                resultsBody.appendChild(tr);
-            });
-        }
-
-        // Initialize application
-        async function initApp() {
-            try {
-                // Initialize dropdowns
-                initDropdowns();
-                
-                // Show loading
-                showLoading(true);
-                
-                // Fetch data
-                const response = await fetch("DSE-Engineering-College-List.json");
-                const jsonData = await response.json();
-                excelData = jsonData["MHT-CET College Data"];
-                
-                // Populate dropdowns
-                populateDropdowns(excelData);
-                
-                // Hide loading
-                showLoading(false);
-                
-                // Set up event listeners
-                document.getElementById("predictButton").addEventListener("click", () => {
-                    filteredData = filterData();
-                    if (filteredData && filteredData.length > 0) {
-                        document.querySelector(".container").style.display = "none";
-                        document.getElementById("resultsContainer").style.display = "block";
-                        displaySearchParams();
-                        displayResults(1);
-                    } else if (filteredData) {
-                        showNotification("No colleges found matching your criteria", "info");
-                    }
-                });
-
-                document.getElementById("resetBtn").addEventListener("click", resetForm);
-                document.getElementById("downloadPdfBtn").addEventListener("click", downloadPDF);
-                document.getElementById("searchResults").addEventListener("input", searchResults);
-                document.getElementById("clearSearch").addEventListener("click", () => {
-                    document.getElementById("searchResults").value = "";
-                    displayResults(currentPage);
-                });
-                
-            } catch (error) {
-                showLoading(false);
-                showNotification("Failed to load college data. Please try again later.", "error");
-                console.error("Error loading data:", error);
-            }
-        }
-
-        // Initialize the application when DOM is loaded
-        document.addEventListener('DOMContentLoaded', initApp);
+// Kickoff
+document.addEventListener("DOMContentLoaded", initApp);

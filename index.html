@@ -1,173 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Second Year College Predictor</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>College Predictor</title>
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"
+  />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </head>
-
 <body>
-    <div class="logo-container">
-        <div class="logo">SP</div>
-    </div>
+ <div class="logo-container"><div class="logo">SP</div></div>
+  <div id="notification" class="notification">
+    <i class="fas fa-exclamation-circle"></i><span></span>
+  </div>
 
-    <div id="notification" class="notification">
-        <i class="fas fa-exclamation-circle"></i>
-        <span>Error message will appear here</span>
-    </div>
+  <div class="container">
+    <header>
+      <h1><i class="fas fa-graduation-cap"></i> Direct Second Year College Predictor</h1>
+      <p>Find engineering colleges based on Diploma Scores</p>
+    </header>
+    <main>
+      <div class="info-box">
+        <i class="fas fa-info-circle"></i>
+        <div>Enter your CET details and apply filters to search colleges.</div>
+      </div>
 
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-graduation-cap"></i> Direct Second Year College Predictor</h1>
-            <p>Find your dream engineering college based on Diploma Scores</p>
-        </header>
-
-        <main>
-            <div class="info-box">
-                <i class="fas fa-info-circle"></i>
-                <div>Enter your CET details to find suitable colleges. Use filters to narrow down your search.</div>
-            </div>
-
-            <form id="predictorForm" class="form-section">
-                <h2><i class="fas fa-filter"></i> Filter Options</h2>
-
-                <div class="form-group">
-                    <label for="seatType"><i class="fas fa-chair"></i> Select Seat Type:</label>
-                    <select id="seatType" multiple>
-                        <!-- <option value="All">All</option> -->
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="branch"><i class="fas fa-code-branch"></i> Select Branch:</label>
-                    <select id="branch" multiple>
-                        <!-- <option value="All">All</option> -->
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="collegeType"><i class="fas fa-university"></i> Select College Type:</label>
-                    <select id="collegeType" multiple>
-                        <option value="All">All</option>
-                        <option value="Government">Government</option>
-                        <option value="Autonomous">Autonomous</option>
-                        <option value="Aided">Aided</option>
-                        <option value="Unaided">Unaided</option>
-                    </select>
-                </div>
-
-                <div class="form-group radio-group">
-                    <label><i class="fas fa-chart-line"></i> Filter by:</label>
-                    <div>
-                        <label><input type="radio" id="percentileOption" name="predictType" value="percentile" checked>
-                            Percentile</label>
-                        <label><input type="radio" id="rankOption" name="predictType" value="rank"> Rank</label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="inputValue"><i class="fas fa-calculator"></i> Enter Value:</label>
-                    <input type="number" id="inputValue" required placeholder="Enter your percentile or rank" min="0"
-                        max="100">
-                    <small id="valueHelp" class="form-text text-muted"
-                        style="display: block; margin-top: 5px; color: #6c757d; font-size: 0.85rem;">
-                        Enter percentile (0-100) or rank
-                    </small>
-                </div>
-
-                <div class="form-group">
-                    <label for="collegeCount"><i class="fas fa-list-ol"></i> Number of Colleges to Display:</label>
-                    <select id="collegeCount">
-                        <option value="10">Top 10</option>
-                        <option value="20">Top 20</option>
-                        <option value="50">Top 50</option>
-                        <option value="100">Top 100</option>
-                        <option value="300" selected>Top 300</option>
-                        <option value="all">All</option>
-                    </select>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" id="predictButton">
-                        <i class="fas fa-search"></i> Predict Colleges
-                    </button>
-                </div>
-            </form>
-        </main>
-
-        <footer>
-            <p>© 2025 College Predictor | Data Source: CET-CELL</p>
-            <div class="dev-credit">Developed by Shreyas Pawar</div>
-        </footer>
-    </div>
-
-    <!-- Results Section -->
-    <div id="resultsContainer" class="results-container">
-        <div class="results-header">
-            <h1><i class="fas fa-university"></i> College Prediction Results</h1>
-            <div class="controls">
-                <button id="downloadPdfBtn"><i class="fas fa-file-pdf"></i> Download PDF</button>
-                <button id="resetBtn"><i class="fas fa-redo"></i> New Search</button>
-            </div>
+      <form id="predictorForm" onsubmit="event.preventDefault();">
+        <div class="form-group">
+          <label>Select Seat Type:</label>
+          <select id="seatType" multiple></select>
         </div>
+        <div class="form-group">
+          <label>Select Branch:</label>
+          <select id="branch" multiple></select>
+        </div>
+        <div class="form-group">
+          <label>Select College Type:</label>
+          <select id="collegeType" multiple></select>
+        </div>
+        <div class="form-group">
+          <label>Select Region:</label>
+          <select id="region" multiple></select>
+        </div>
+        <div class="form-group radio-group">
+          <label>Filter By:</label>
+          <label><input type="radio" name="predictType" value="percentile" checked> Percentile</label>
+          <label><input type="radio" name="predictType" value="rank"> Rank</label>
+        </div>
+        <div class="form-group">
+          <label>Enter Value:</label>
+          <input type="number" id="inputValue" placeholder="Percentile or Rank" required />
+        </div>
+        <div class="form-group">
+          <label>Number of Colleges:</label>
+          <select id="collegeCount">
+            <option value="10">Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="50">Top 50</option>
+            <option value="all" selected>All</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="predictButton">
+            <i class="fas fa-search"></i> Predict Colleges
+          </button>
+        </div>
+      </form>
+    </main>
+    <footer>
+      <p>© 2025 College Predictor | Data Source: CET‑CELL</p>
+      <div class="dev-credit">Developed by Shreyas Pawar</div>
+    </footer>
+  </div>
 
-        <main>
-            <div class="summary">
-                <h2 style="padding: 20px 20px 10px; font-size: 1.5rem;"><i class="fas fa-info-circle"></i> Your Results
-                </h2>
-                <div id="searchParams" class="param-container">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-
-            <div class="results-controls">
-                <div class="results-count">
-                    Showing <span id="currentPage">1</span> to <span id="totalPages">10</span> of <span
-                        id="totalResults">0</span> results
-                </div>
-                <div class="results-filter">
-                    <input type="text" id="searchResults" placeholder="Search colleges...">
-                    <button id="clearSearch"><i class="fas fa-times"></i> Clear</button>
-                </div>
-            </div>
-
-            <div class="results-table-container" style="overflow-x: auto; padding: 0 20px 20px;">
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Institute</th>
-                            <th>Branch</th>
-                            <th>College Type</th>
-                            <th>Seat Type</th>
-                            <th>Closing Rank</th>
-                            <th>Percentile</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultsBody">
-                        <!-- Will be populated by JavaScript -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pagination" id="pagination">
-                <!-- Pagination buttons will be generated here -->
-            </div>
-        </main>
-
-        <footer>
-            <p>© 2025 College Predictor | Results are based on previous year data</p>
-            <div class="dev-credit">Developed by Shreyas Pawar</div>
-        </footer>
+  <div id="resultsContainer" class="results-container" style="display:none;">
+    <div class="results-header">
+      <h1><i class="fas fa-university"></i> College Prediction Results</h1>
+      <div class="controls">
+        <button id="downloadPdfBtn"><i class="fas fa-file-pdf"></i> Download PDF</button>
+        <button id="resetBtn"><i class="fas fa-redo"></i> New Search</button>
+      </div>
     </div>
+    <main>
+      <div id="searchParams" class="param-container"></div>
+      <div class="results-controls">
+        <div class="results-count">
+          Showing <span id="currentPage">0</span> to <span id="totalPages">0</span> of <span
+            id="totalResults">0</span>
+        </div>
+        <div class="results-filter">
+          <input type="text" id="searchResults" placeholder="Search colleges..." />
+          <button id="clearSearch"><i class="fas fa-times"></i> Clear</button>
+        </div>
+      </div>
+      <div class="results-table-container">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Institute</th>
+              <th>Branch</th>
+              <th>College Type</th>
+              <th>Seat Type</th>
+              <th>Rank</th>
+              <th>Percentile</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </main>
+    <footer>
+      <p>© 2025 College Predictor | Results based on previous year data</p>
+    </footer>
+  </div>
 
-    <script src="script.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
