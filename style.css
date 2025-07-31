@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-//StyleSheet for Predictor
+
 
 :root {
     --primary: #4361ee;
@@ -14,7 +13,6 @@
     --shadow: rgba(0, 0, 0, 0.1);
     --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
-=======
  :root {
       --primary: #4361ee;
       --secondary: #3f37c9;
@@ -28,7 +26,6 @@
       --shadow: rgba(0, 0, 0, 0.1);
       --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
->>>>>>> ca37158 (Added some new feature with License File)
 
     * {
       margin: 0;
