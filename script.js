@@ -1,6 +1,7 @@
 // Global variables
 let excelData = [];
 let filteredData = [];
+let originalFilteredData = [];
 const resultsPerPage = 20;
 let currentPage = 1;
 let totalPages = 1;
@@ -60,7 +61,10 @@ function initDropdowns() {
   branchChoices = new Choices("#branch", {
     removeItemButton: true,
     placeholder: true,
-    placeholderValue: "Choose branches"
+    placeholderValue: "Choose branches",
+    searchEnabled: true,
+    searchPlaceholderValue: "Search branches...",
+    shouldSort: false
   });
   collegeChoices = new Choices("#collegeType", {
     removeItemButton: true,
@@ -228,8 +232,8 @@ function displayResults(page = 1) {
 
   totalPages = Math.ceil(filteredData.length / resultsPerPage);
   document.getElementById("totalResults").textContent = filteredData.length;
-  document.getElementById("currentPage").textContent = start + 1;
-  document.getElementById("totalPages").textContent = end;
+  document.getElementById("startResult").textContent = filteredData.length ? start + 1 : 0;
+  document.getElementById("endResult").textContent = end;
 
   renderPagination();
 }
@@ -238,6 +242,8 @@ function displayResults(page = 1) {
 function renderPagination() {
   const container = document.getElementById("pagination");
   container.innerHTML = "";
+
+  if (totalPages <= 1) return;
 
   const prevBtn = document.createElement("button");
   prevBtn.textContent = "<";
@@ -266,51 +272,129 @@ function renderPagination() {
 function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+
+  // ---- Title ----
   doc.setFontSize(18);
-  doc.text("College Prediction Results", 105, 15, null, null, "center");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(33, 37, 41); // Dark gray
+  doc.text(" College Predictor Results", 105, 20, null, null, "center");
+
+  // ---- Subtitle ----
   doc.setFontSize(12);
-  let y = 30;
-  document.querySelectorAll(".param-card").forEach((card) => {
-    doc.text(`${card.querySelector("h3").textContent}: ${card.querySelector("p").textContent}`, 15, y);
-    y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 100, 100); // Muted
+  doc.text("Based on your percentile/rank and selected filters", 105, 28, null, null, "center");
+
+  // ---- Search Parameters Summary ----
+  doc.setFontSize(10);
+  doc.setTextColor(50, 50, 50);
+  let y = 40;
+
+  const params = [
+    { label: "Region", value: getSelectedValues(regionChoices).join(", ") || "All" },
+    { label: "Seat Type", value: getSelectedValues(seatChoices).join(", ") || "All" },
+    { label: "Branch", value: getSelectedValues(branchChoices).join(", ") || "All" },
+    { label: "College Type", value: getSelectedValues(collegeChoices).join(", ") || "All" }
+  ];
+
+  const predictType = document.querySelector('input[name="predictType"]:checked').value;
+  params.push({ label: "Filter By", value: predictType === "percentile" ? "Percentile" : "Rank" });
+  params.push({
+    label: predictType === "percentile" ? "Percentile" : "Rank",
+    value: document.getElementById("inputValue").value
   });
-  const headers = [["Institute", "Branch", "College Type", "Seat Type", "Rank", "Percentile"]];
+
+  // Display filters in two columns
+  let xLeft = 14;
+  let xRight = 105;
+  params.forEach((p, index) => {
+    const x = index % 2 === 0 ? xLeft : xRight;
+    if (index % 2 === 0 && index !== 0) y += 7;
+    doc.text(`${p.label}: ${p.value}`, x, y);
+  });
+  y += 15;
+
+  // ---- Table Setup ----
+  const headers = [["Institute", "Branch", "Seat Type", "Rank", "Percentile"]];
   const body = filteredData.map((r) => [
     r["Institute"] || "N/A",
     r["Branch"] || "N/A",
-    getCollegeTypeFromInstitute(r["Institute"]),
     r["Seat Type"] || "N/A",
     r["Rank"] ?? "N/A",
     r["Percentile"] ?? "N/A"
   ]);
-  doc.autoTable({ startY: y + 10, head: headers, body, styles: { fontSize: 9 } });
-  doc.save(`college-predictor-${Date.now()}.pdf`);
+
+  // ---- Draw Table ----
+  doc.autoTable({
+    startY: y,
+    head: headers,
+    body: body,
+    theme: "striped", // more elegant than grid
+    headStyles: {
+      fillColor: [60, 150, 220], // nice blue
+      textColor: 255,
+      fontStyle: "bold"
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250 , 250] // light gray
+    },
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 3,
+      textColor: [25, 25, 25]
+    },
+    margin: { bottom: 30 },
+    didDrawPage: function (data) {
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Developed by Shreyas Pawar  |  https://github.com/ShreyasP10",
+        data.settings.margin.left,
+        doc.internal.pageSize.height - 15
+      );
+
+      doc.setFontSize(8);
+      doc.setTextColor(160);
+      doc.text(
+        "Note: This data is for reference only. Please verify with official sources.",
+        105,
+        doc.internal.pageSize.height - 10,
+        null, null, "center"
+      );
+
+      const pageCount = doc.internal.getNumberOfPages();
+      const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(
+        `Page ${currentPage} of ${pageCount}`,
+        doc.internal.pageSize.width - 20,
+        doc.internal.pageSize.height - 10
+      );
+    }
+  });
+
+  // Save file
+  doc.save("College-Predictor by Shreyas Pawar.pdf");
 }
+
 
 // Live search filter on displayed results
 function searchResults() {
   const term = document.getElementById("searchResults").value.toLowerCase();
-  if (!term) return displayResults(currentPage);
-  const results = filteredData.filter((d) =>
-    d["Institute"]?.toLowerCase().includes(term) ||
-    d["Branch"]?.toLowerCase().includes(term) ||
-    d["Seat Type"]?.toLowerCase().includes(term)
-  );
-  const body = document.getElementById("resultsBody");
-  body.innerHTML = results.length
-    ? ""
-    : `<tr><td colspan="6">No results</td></tr>`;
-  results.forEach((d) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${d["Institute"] || "N/A"}</td>
-      <td>${d["Branch"] || "N/A"}</td>
-      <td>${getCollegeTypeFromInstitute(d["Institute"])}</td>
-      <td>${d["Seat Type"] || "N/A"}</td>
-      <td>${d["Rank"] ?? "N/A"}</td>
-      <td>${d["Percentile"] ?? "N/A"}</td>`;
-    body.appendChild(tr);
-  });
+  if (!term) {
+    filteredData = [...originalFilteredData];
+  } else {
+    filteredData = originalFilteredData.filter((d) =>
+      (d["Institute"]?.toLowerCase().includes(term) ||
+      d["Branch"]?.toLowerCase().includes(term) ||
+      d["Seat Type"]?.toLowerCase().includes(term))
+    );
+  }
+  currentPage = 1;
+  displayResults();
 }
 
 // Reset filters & UI
@@ -323,6 +407,7 @@ function resetForm() {
   collegeChoices.clearStore();
   regionChoices.clearStore();
   populateDropdowns(excelData);
+  document.getElementById("searchResults").value = "";
 }
 
 // Initialization
@@ -339,6 +424,7 @@ async function initApp() {
     document.getElementById("predictButton").addEventListener("click", () => {
       filteredData = filterData();
       if (filteredData && filteredData.length) {
+        originalFilteredData = [...filteredData];
         document.querySelector(".container").style.display = "none";
         document.getElementById("resultsContainer").style.display = "block";
         displaySearchParams();
@@ -353,12 +439,20 @@ async function initApp() {
     document.getElementById("searchResults").addEventListener("input", searchResults);
     document.getElementById("clearSearch").addEventListener("click", () => {
       document.getElementById("searchResults").value = "";
-      displayResults(currentPage);
+      searchResults();
+    });
+    
+    // Add rank/percentile toggle functionality
+    document.querySelectorAll('input[name="predictType"]').forEach(input => {
+      input.addEventListener("change", function() {
+        document.getElementById("inputLabel").textContent = 
+          this.value === "percentile" ? "Enter Percentile:" : "Enter Rank:";
+      });
     });
   } catch (err) {
     console.error(err);
     showLoading(false);
-    showNotification("Failed to load college data", "error");
+    showNotification("Failed to load college data. Please try again later.", "error");
   }
 }
 
