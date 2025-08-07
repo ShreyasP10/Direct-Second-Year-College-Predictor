@@ -324,7 +324,7 @@ function downloadPDF() {
     r["Percentile"] ?? "N/A"
   ]);
 
-  // ---- Draw Table ----
+  
   doc.autoTable({
     startY: y,
     head: headers,
@@ -379,6 +379,7 @@ function downloadPDF() {
   // Save file
   doc.save("College-Predictor by Shreyas Pawar.pdf");
 }
+
 
 
 // Live search filter on displayed results
